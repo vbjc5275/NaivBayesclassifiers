@@ -8,7 +8,7 @@ import re
 import random
 from math import log,exp
 from collections import defaultdict
-from sklearn.naive_bayes import BernoulliNB
+
 
 def read_file(filepath="SMSSpamCollection.txt"):
     """
@@ -22,67 +22,6 @@ def read_file(filepath="SMSSpamCollection.txt"):
             message = message.strip()
             mails.append((message,is_spam))
     return mails
-
-
-
-    
-def count_words(training_set):
-    """training set consists of pairs (message, is_spam)"""
-    counts = defaultdict(lambda :[0,0])
-    for message, is_spam in training_set:
-        for word in tokenize(message):
-            counts[word][0 if is_spam else 1] += 1
-    return counts
-
-def word_probabilities(word_count,total_spams, total_non_spams,k=0.5):
-    word_prob = {}
-    for word,count in word_count.items():
-       prob_if_spam =  (1+count[0])/(2*k+total_spams)
-       prob_if_not_spam = (1+count[1])/(2*k+total_non_spams)
-       word_prob[word] = (prob_if_spam,prob_if_not_spam)
-    return word_prob
-
-def spam_probability(word_probs, message):
-    message_words = tokenize(message)
-    log_prob_if_spam = log_prob_if_not_spam = 0.0
-
-    for word, (prob_if_spam, prob_if_not_spam) in word_probs.items():
-
-        # for each word in the message,
-        # add the log probability of seeing it
-        if word in message_words:
-            log_prob_if_spam += log(prob_if_spam)
-            log_prob_if_not_spam += log(prob_if_not_spam)
-
-        # for each word that's not in the message
-        # add the log probability of _not_ seeing it
-        else:
-            log_prob_if_spam += log(1.0 - prob_if_spam)
-            log_prob_if_not_spam += log(1.0 - prob_if_not_spam)
-
-    prob_if_spam = exp(log_prob_if_spam)
-    prob_if_not_spam = exp(log_prob_if_not_spam)
-    return prob_if_spam / (prob_if_spam + prob_if_not_spam)
-
-word_count = count_words(mails)
-
-total_spams = len([is_spam for _,is_spam in mails if is_spam])
-total_non_spams = len([is_spam for _,is_spam in mails if not is_spam])
-word_probs = word_probabilities(word_count,total_spams, total_non_spams)
-
-#spam_probability(word_probs, mails[8][0])
-
-y_proba = []
-y_true = []
-for message,actual in mails:
-    y_proba.append(spam_probability(word_probs, message))
-    y_true.append(actual)
-    
-y_pred  = [1 if proba>0.5 else 0 for proba in y_proba ]
-tn, fp, fn, tp = confusion_matrix(y_true,y_pred).ravel()
-(tn+tp)/(fp+fn+tn+tp)
-
-
 
 class NaiveBayesClassifier():
     def __init__(self, k = 1):
@@ -137,10 +76,10 @@ class NaiveBayesClassifier():
     def predict(self,message):
         return 1 if self.predict_proba(message)>0.5 else 0
 
-def confunsion_matrix(y_true,y_pred):
-    #tn, fp, fn, tp
+def confusion_matrix(y_true,y_pred):
+    tn, fp, fn, tp = 0,0,0,0
     for actual,prediction in zip(y_true,y_pred):
-        tn, fp, fn, tp = 0,0,0,0
+        
         if (actual==0 and prediction==0):
            tn +=1
         elif(actual==0 and prediction==1):
@@ -170,6 +109,7 @@ for x in test_X:
     y_pred.append(nb.predict(x))
 
 tn, fp, fn, tp = confusion_matrix(test_y,y_pred)
+print(tn, fp, fn, tp)
 print((tn+tp)/(fp+fn+tn+tp))
 
 
