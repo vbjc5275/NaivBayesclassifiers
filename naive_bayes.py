@@ -8,9 +8,10 @@ import re
 import random
 from math import log,exp
 from collections import defaultdict
-
+import numpy as np
 
 def read_file(filepath="SMSSpamCollection.txt"):
+    print(f"read {filepath}...")
     """
     :return mails: 訊息列表
     """
@@ -23,6 +24,7 @@ def read_file(filepath="SMSSpamCollection.txt"):
             mails.append((message,is_spam))
     return mails
 
+
 class NaiveBayesClassifier():
     def __init__(self, k = 1):
         self.k = k  # smoothing factor
@@ -32,10 +34,11 @@ class NaiveBayesClassifier():
         
     def tokenize(self,message):
         message = message.lower()                      
-        all_words = re.findall("[a-z]+", message) 
+        all_words = re.findall("[a-z']+", message) 
         return set(all_words)
     
     def train(self,messages,spam_or_not):
+        print("training data..")
         """
         messages:訊息文本
         spam_or_not:是否為垃圾訊息
@@ -54,7 +57,6 @@ class NaiveBayesClassifier():
             self.word_prob_[word][1] = word_prob_if_spam
             self.word_prob_[word][0] = word_prob_if_non_spam
 
-    
     def predict_proba(self,message):
         log_prob_if_spam = 0
         log_prob_if_non_spam = 0
@@ -77,9 +79,9 @@ class NaiveBayesClassifier():
         return 1 if self.predict_proba(message)>0.5 else 0
 
 def confusion_matrix(y_true,y_pred):
+    print ("generating confusion matrix")
     tn, fp, fn, tp = 0,0,0,0
     for actual,prediction in zip(y_true,y_pred):
-        
         if (actual==0 and prediction==0):
            tn +=1
         elif(actual==0 and prediction==1):
@@ -91,6 +93,8 @@ def confusion_matrix(y_true,y_pred):
     return  tn, fp, fn, tp
 
 def split_data(mails,ratio=0.8):
+    print("split data..")
+    random.seed(2)
     random.shuffle(mails)
     train_num  = round(0.8*len(mails))
     train_X = [ mail[0] for mail in mails[:train_num]]
@@ -99,18 +103,56 @@ def split_data(mails,ratio=0.8):
     test_X = [ mail[0] for mail in mails[train_num:]]
     test_y = [ mail[1] for mail in mails[train_num:]]
     return (train_X,train_y,test_X,test_y)
-   
-mails = read_file()
-train_X,train_y, test_X,test_y = split_data(mails)
-nb = NaiveBayesClassifier()
-nb.train(train_X,train_y)
-y_pred = []
-for x in test_X:
-    y_pred.append(nb.predict(x))
 
-tn, fp, fn, tp = confusion_matrix(test_y,y_pred)
-print(tn, fp, fn, tp)
-print((tn+tp)/(fp+fn+tn+tp))
+def get_top_proba_of_spam(proba,messages,num=5):
+    def tokenize(messages):
+        words = []
+        for message in messages:
+            message = message.lower()                      
+            all_words = re.findall("[a-z]+", message) 
+            words.append(set(all_words))
+        return words
+    
+    sort_index = np.argsort(proba)[::-1][:5]
+    sorted_proba = [proba[i] for i in sort_index]
+    sorted_message = [messages[i] for i in sort_index]
+    return (sorted_proba,sorted_message,tokenize(sorted_message))
+
+def main():
+    mails = read_file()
+    train_X,train_y, test_X,test_y = split_data(mails)
+    nb = NaiveBayesClassifier()
+    nb.train(train_X,train_y)
+    
+    #get proba
+    y_proba = []
+    y_pred = []
+    for x in test_X:
+        proba = nb.predict_proba(x)
+        y_proba.append(proba)
+        y_pred.append(1 if proba>0.5 else 0)
+    
+    tn, fp, fn, tp = confusion_matrix(test_y,y_pred)
+    precision = (tn+tp)/(tn+fp+fn+tp)
+    recall = tp/(tp+fn)
+    print(f"(tn, fp, fn, tp)=>{(tn, fp, fn, tp)}")
+    print(f"precision : {precision}")
+    print(f"recall : {recall}")
+    
+    #spammiest_message
+    proba,message,tokens = get_top_proba_of_spam(y_proba,test_X)
+    word_probs = []
+    for token in tokens:
+        probs = []
+        for word in token:
+            if word in nb.word_prob_:
+                probs.append(nb.word_prob_[word][0])
+        word_probs.append(probs)
+        
+if __name__ == "__main__":
+    main()
+            
+
 
 
 
